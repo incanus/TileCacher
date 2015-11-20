@@ -7,6 +7,7 @@ class ViewController: UIViewController, MGLMapViewDelegate {
 
     var rendered = false
     var waitForRenders = false
+    var interactive = true
 
     struct Tile {
         var z = 0
@@ -14,54 +15,64 @@ class ViewController: UIViewController, MGLMapViewDelegate {
         var y = 0
     }
 
+    let masterTile = Tile(z: 11, x: 326, y: 732)
+
     let earthRadiusMeters: Double = 6378137
     let tileSize: CGFloat = 512
+    let maxLatitude = 85.05112878
+    let radians2degrees = 180 / M_PI
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        map = MGLMapView(frame: CGRect(x: (view.bounds.size.width - tileSize) / 2,
-            y: (view.bounds.size.height - tileSize) / 2,
-            width: tileSize,
-            height: tileSize))
-        map.userInteractionEnabled = false
+        map = MGLMapView(frame: view.bounds)
         map.delegate = self
-        map.debugActive = true
         view.addSubview(map)
+
+        map.addGestureRecognizer(UITapGestureRecognizer(target: self, action: "toggleInteractive"))
     }
 
     override func viewDidAppear(animated: Bool) {
         super.viewDidAppear(animated)
 
+        toggleInteractive()
+    }
+
+    func mapViewDidFinishRenderingMap(mapView: MGLMapView, fullyRendered: Bool) {
+        rendered = true
+    }
+
+    func kickoffDownloads() {
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0)) {
             [unowned self] in
-            let masterTile = Tile(z: 11, x: 326, y: 732)
             var numberOfTilesPerSide = 1
             var totalTiles = 0
-            for z in masterTile.z...15 {
-                let factor = Int(pow(Double(2), Double((z - masterTile.z))))
-                let lowX = masterTile.x * factor
+            for z in self.masterTile.z...15 {
+                let factor = Int(pow(Double(2), Double((z - self.masterTile.z))))
+                let lowX = self.masterTile.x * factor
                 let highX = lowX + numberOfTilesPerSide
-                let lowY = masterTile.y * factor
+                let lowY = self.masterTile.y * factor
                 let highY = lowY + numberOfTilesPerSide
                 for x in lowX..<highX {
                     for y in lowY..<highY {
-                        let tile = Tile(z: z, x: x, y: y)
-                        dispatch_sync(dispatch_get_main_queue()) {
-                            [unowned self] in
-                            self.rendered = false
-                            self.zoomToTile(tile)
-                            totalTiles++
-                            print("\(totalTiles): \(tile)")
-                        }
-                        if self.waitForRenders {
-                            var waitTime: NSTimeInterval = 0
-                            while !self.rendered && waitTime < 0.5 {
-                                NSThread.sleepForTimeInterval(0.1)
-                                waitTime += 0.1
+                        if !self.interactive {
+                            let tile = Tile(z: z, x: x, y: y)
+                            dispatch_sync(dispatch_get_main_queue()) {
+                                [unowned self] in
+                                self.rendered = false
+                                self.zoomToTile(tile)
+                                totalTiles++
+                                print("\(totalTiles): \(tile)")
                             }
-                        } else {
-                            NSThread.sleepForTimeInterval(0.1)
+                            if self.waitForRenders {
+                                var waitTime: NSTimeInterval = 0
+                                while !self.rendered && waitTime < 0.5 {
+                                    NSThread.sleepForTimeInterval(0.1)
+                                    waitTime += 0.1
+                                }
+                            } else {
+                                NSThread.sleepForTimeInterval(0.1)
+                            }
                         }
                     }
                 }
@@ -70,17 +81,44 @@ class ViewController: UIViewController, MGLMapViewDelegate {
         }
     }
 
-    func mapViewDidFinishRenderingMap(mapView: MGLMapView, fullyRendered: Bool) {
-        rendered = true
+    func toggleInteractive() {
+        if interactive {
+            map.scrollEnabled = false
+            map.zoomEnabled = false
+            map.rotateEnabled = false
+            map.pitchEnabled = false
+
+            map.frame = CGRect(x: (view.bounds.size.width - tileSize) / 2,
+                y: (view.bounds.size.height - tileSize) / 2,
+                width: tileSize,
+                height: tileSize)
+
+            kickoffDownloads()
+        } else {
+            map.scrollEnabled = true
+            map.zoomEnabled = true
+            map.rotateEnabled = true
+            map.pitchEnabled = true
+
+            let center = map.centerCoordinate
+            let zoom = map.zoomLevel
+
+            map.frame = view.bounds
+            map.setCenterCoordinate(center, zoomLevel: zoom, animated: false)
+        }
+
+        map.toggleDebug()
+
+        interactive = !interactive
     }
 
     func zoomToTile(tile: Tile) {
 
         // cribbed from GL projection.hpp
         func coordinateForProjectedMeters(rect: CGPoint) -> CLLocationCoordinate2D {
-            var lat = (2 * atan(exp(Double(rect.y) / earthRadiusMeters)) - (M_PI / 2)) * 180 / M_PI
-            let lon = Double(rect.x) * 180 / M_PI / earthRadiusMeters
-            lat = fmin(fmax(lat, -85.05112878), 85.05112878)
+            var lat = (2 * atan(exp(Double(rect.y) / earthRadiusMeters)) - (M_PI / 2)) * radians2degrees
+            let lon = Double(rect.x) * radians2degrees / earthRadiusMeters
+            lat = fmin(fmax(lat, -maxLatitude), maxLatitude)
             return CLLocationCoordinate2D(latitude: lat, longitude: lon)
         }
 
