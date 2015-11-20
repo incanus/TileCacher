@@ -26,6 +26,7 @@ class ViewController: UIViewController, MGLMapViewDelegate {
         super.viewDidLoad()
 
         map = MGLMapView(frame: view.bounds)
+        map.pitchEnabled = false
         map.delegate = self
         view.addSubview(map)
 
@@ -87,19 +88,18 @@ class ViewController: UIViewController, MGLMapViewDelegate {
                 map.scrollEnabled = false
                 map.zoomEnabled = false
                 map.rotateEnabled = false
-                map.pitchEnabled = false
 
                 map.frame = CGRect(x: (view.bounds.size.width - tileSize) / 2,
                     y: (view.bounds.size.height - tileSize) / 2,
                     width: tileSize,
                     height: tileSize)
+                map.direction = 0
 
                 kickoffDownloads()
             } else {
                 map.scrollEnabled = true
                 map.zoomEnabled = true
                 map.rotateEnabled = true
-                map.pitchEnabled = true
 
                 let center = map.centerCoordinate
                 let zoom = map.zoomLevel
