@@ -24,6 +24,7 @@ class ViewController: UIViewController, MGLMapViewDelegate {
             y: (view.bounds.size.height - tileSize) / 2,
             width: tileSize,
             height: tileSize))
+        map.userInteractionEnabled = false
         map.delegate = self
         map.debugActive = true
         view.addSubview(map)
