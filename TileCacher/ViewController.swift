@@ -29,13 +29,13 @@ class ViewController: UIViewController, MGLMapViewDelegate {
         map.delegate = self
         view.addSubview(map)
 
-        map.addGestureRecognizer(UITapGestureRecognizer(target: self, action: "toggleInteractive"))
+        map.addGestureRecognizer(UILongPressGestureRecognizer(target: self, action: "toggleInteractive:"))
     }
 
     override func viewDidAppear(animated: Bool) {
         super.viewDidAppear(animated)
 
-        toggleInteractive()
+        toggleInteractive(nil)
     }
 
     func mapViewDidFinishRenderingMap(mapView: MGLMapView, fullyRendered: Bool) {
@@ -81,35 +81,37 @@ class ViewController: UIViewController, MGLMapViewDelegate {
         }
     }
 
-    func toggleInteractive() {
-        if interactive {
-            map.scrollEnabled = false
-            map.zoomEnabled = false
-            map.rotateEnabled = false
-            map.pitchEnabled = false
+    func toggleInteractive(longPress: UILongPressGestureRecognizer?) {
+        if longPress == nil || longPress!.state == .Recognized {
+            if interactive {
+                map.scrollEnabled = false
+                map.zoomEnabled = false
+                map.rotateEnabled = false
+                map.pitchEnabled = false
 
-            map.frame = CGRect(x: (view.bounds.size.width - tileSize) / 2,
-                y: (view.bounds.size.height - tileSize) / 2,
-                width: tileSize,
-                height: tileSize)
+                map.frame = CGRect(x: (view.bounds.size.width - tileSize) / 2,
+                    y: (view.bounds.size.height - tileSize) / 2,
+                    width: tileSize,
+                    height: tileSize)
 
-            kickoffDownloads()
-        } else {
-            map.scrollEnabled = true
-            map.zoomEnabled = true
-            map.rotateEnabled = true
-            map.pitchEnabled = true
+                kickoffDownloads()
+            } else {
+                map.scrollEnabled = true
+                map.zoomEnabled = true
+                map.rotateEnabled = true
+                map.pitchEnabled = true
 
-            let center = map.centerCoordinate
-            let zoom = map.zoomLevel
+                let center = map.centerCoordinate
+                let zoom = map.zoomLevel
 
-            map.frame = view.bounds
-            map.setCenterCoordinate(center, zoomLevel: zoom, animated: false)
+                map.frame = view.bounds
+                map.setCenterCoordinate(center, zoomLevel: zoom, animated: false)
+            }
+
+            map.toggleDebug()
+
+            interactive = !interactive
         }
-
-        map.toggleDebug()
-
-        interactive = !interactive
     }
 
     func zoomToTile(tile: Tile) {
